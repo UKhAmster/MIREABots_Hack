@@ -1,0 +1,8 @@
+mireabots-api
+*.md
+.git
+.gitignore
+.env
+.env.example
+API_EXAMPLE.md
+

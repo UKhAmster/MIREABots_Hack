@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mireabots-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ml-service:
+    build:
+      context: ./ds/MIREABots_Hack/ds_service
+      dockerfile: Dockerfile
+    container_name: mireabots-ml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ds/MIREABots_Hack/ds_service:/app
+    working_dir: /app
+    environment:
+      - PIP_DEFAULT_TIMEOUT=600
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mireabots-api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      PORT: 8080
+      ML_SERVICE_URL: http://ml-service:8000
+    depends_on:
+      ml-service:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
